@@ -1,0 +1,3 @@
+#!/bin/bash
+cd ~/JVault/src-tauri
+cargo tauri build && ~/JVault/src-tauri/target/release/jvault

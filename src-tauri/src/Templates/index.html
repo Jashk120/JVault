@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JVault</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:        #080a0f;
+      --surface:   #0d1017;
+      --card:      #111520;
+      --card-hover:#161c2e;
+      --border:    #1e2535;
+      --border2:   #252d42;
+      --accent:    #5b8dee;
+      --accent2:   #8b5cf6;
+      --accent3:   #06d6a0;
+      --text:      #dde3f5;
+      --text2:     #8899bb;
+      --muted:     #4a5578;
+      --danger:    #f05050;
+      --titlebar:  #060810;
+      --glow:      rgba(91,141,238,0.15);
+      --glow2:     rgba(139,92,246,0.1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ── Noise overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0.4;
+    }
+
+    /* ── Titlebar ── */
+    #titlebar {
+      height: 40px;
+      background: var(--titlebar);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+      -webkit-app-region: drag;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      position: relative;
+    }
+    #titlebar::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+      opacity: 0.4;
+    }
+    #titlebar .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    #titlebar .logo-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--accent3);
+      box-shadow: 0 0 8px var(--accent3);
+      flex-shrink: 0;
+      -webkit-app-region: no-drag;
+    }
+    #titlebar .spacer { flex: 1; }
+    #titlebar .win-controls {
+      display: flex;
+      gap: 8px;
+      -webkit-app-region: no-drag;
+    }
+    #titlebar .win-btn {
+      width: 11px; height: 11px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.15s;
+      position: relative;
+    }
+    #titlebar .win-btn:hover { filter: brightness(1.3); transform: scale(1.15); }
+    #btn-close  { background: #ff5f57; }
+    #btn-min    { background: #febc2e; }
+    #btn-max    { background: #28c840; }
+
+    /* ── Layout ── */
+    #layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 210px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 0 16px;
+      flex-shrink: 0;
+      position: relative;
+    }
+    #sidebar::after {
+      content: '';
+      position: absolute;
+      top: 0; right: 0; bottom: 0;
+      width: 1px;
+      background: linear-gradient(180deg, transparent, var(--accent), transparent);
+      opacity: 0.2;
+    }
+    .sidebar-section {
+      padding: 0 14px 6px;
+    }
+    .sidebar-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding: 0 14px 10px;
+    }
+    .sidebar-item {
+      padding: 9px 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text2);
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+      border-radius: 8px;
+      margin: 0 8px 2px;
+      border-left: 2px solid transparent;
+      position: relative;
+    }
+    .sidebar-item:hover {
+      background: rgba(91,141,238,0.07);
+      color: var(--text);
+    }
+    .sidebar-item.active {
+      color: var(--accent);
+      background: rgba(91,141,238,0.1);
+      border-left-color: var(--accent);
+    }
+    .sidebar-item.active::before {
+      content: '';
+      position: absolute;
+      left: -8px; top: 50%;
+      transform: translateY(-50%);
+      width: 3px; height: 60%;
+      background: var(--accent);
+      border-radius: 0 2px 2px 0;
+      box-shadow: 0 0 8px var(--accent);
+    }
+    .sidebar-item svg { flex-shrink: 0; opacity: 0.8; }
+    .sidebar-item.active svg { opacity: 1; }
+
+    .sidebar-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 12px 14px;
+      opacity: 0.5;
+    }
+
+    #sidebar .bottom {
+      margin-top: auto;
+      padding: 0 14px;
+    }
+
+    /* ── Main ── */
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    #toolbar h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text);
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      max-width: 300px;
+    }
+    .search-wrap svg {
+      position: absolute;
+      left: 11px; top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: var(--muted);
+    }
+    #search {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 7px 12px 7px 34px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    #search:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(91,141,238,0.1);
+    }
+    #search::placeholder { color: var(--muted); }
+
+    .toolbar-spacer { flex: 1; }
+
+    #game-count {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(91,141,238,0.3);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 4px 20px rgba(91,141,238,0.5);
+      transform: translateY(-1px);
+      filter: brightness(1.1);
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+      border: 1px solid var(--border2);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: var(--accent); background: rgba(91,141,238,0.05); }
+
+    /* ── Grid ── */
+    #content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      background: 
+        radial-gradient(ellipse at 20% 50%, rgba(91,141,238,0.04) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(139,92,246,0.04) 0%, transparent 50%),
+        var(--bg);
+    }
+    #content::-webkit-scrollbar { width: 5px; }
+    #content::-webkit-scrollbar-track { background: transparent; }
+    #content::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    #content::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+      gap: 16px;
+    }
+
+    /* ── Game Card ── */
+    .game-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+      aspect-ratio: 2/3;
+      display: flex;
+      flex-direction: column;
+    }
+    .game-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 1;
+    }
+    .game-card:hover {
+      transform: translateY(-6px) scale(1.02);
+      border-color: var(--accent);
+      box-shadow: 0 12px 40px rgba(91,141,238,0.2), 0 0 0 1px rgba(91,141,238,0.1);
+    }
+    .game-card:hover .card-overlay { opacity: 1; }
+    .game-card:hover .card-actions { opacity: 1; }
+
+    .card-cover {
+      flex: 1;
+      background: linear-gradient(160deg, #141928 0%, #0d1018 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+    .card-cover img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s;
+    }
+    .game-card:hover .card-cover img { transform: scale(1.05); }
+    .card-cover .default-icon {
+      font-size: 44px;
+      opacity: 0.15;
+      filter: grayscale(1);
+    }
+    .card-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 30%, rgba(10,15,30,0.85) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .play-btn-big {
+      width: 46px; height: 46px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 24px rgba(91,141,238,0.6);
+      transition: transform 0.15s;
+    }
+    .play-btn-big:hover { transform: scale(1.1); }
+
+    .card-info {
+      padding: 10px 11px 11px;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      position: relative;
+      z-index: 2;
+    }
+    .card-name {
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+      letter-spacing: 0.2px;
+    }
+    .card-meta {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 4px;
+      letter-spacing: 0.3px;
+    }
+
+    .card-actions {
+      position: absolute;
+      top: 7px; right: 7px;
+      display: flex; gap: 4px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 10;
+    }
+    .icon-btn {
+      width: 27px; height: 27px;
+      border-radius: 6px;
+      border: none;
+      background: rgba(8,10,15,0.75);
+      color: var(--text2);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .icon-btn:hover { color: var(--text); background: rgba(8,10,15,0.95); }
+    .icon-btn.del:hover { color: var(--danger); border-color: rgba(240,80,80,0.3); }
+
+    /* ── Empty state ── */
+    #empty {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 16px;
+      color: var(--muted);
+      text-align: center;
+    }
+    .empty-icon {
+      width: 80px; height: 80px;
+      border-radius: 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 4px;
+    }
+    .empty-icon svg { opacity: 0.2; }
+    #empty h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text2);
+    }
+    #empty p { font-size: 13px; color: var(--muted); max-width: 220px; line-height: 1.6; }
+
+    /* ── Modal ── */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(4,6,12,0.8);
+      backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .modal-backdrop.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 16px;
+      padding: 28px;
+      width: 460px;
+      max-width: 95vw;
+      transform: translateY(20px) scale(0.97);
+      transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03);
+      position: relative;
+      overflow: hidden;
+    }
+    .modal::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+      opacity: 0.5;
+    }
+    .modal-backdrop.open .modal { transform: translateY(0) scale(1); }
+    .modal h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 22px;
+      color: var(--text);
+    }
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 7px;
+    }
+    .field input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 9px 13px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(91,141,238,0.1);
+    }
+    .field input::placeholder { color: var(--muted); }
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+    .input-row input { flex: 1; }
+    .modal-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .modal-row .btn { flex: 1; justify-content: center; }
+    .btn-danger { background: linear-gradient(135deg, #c0392b, var(--danger)); color: #fff; }
+    .btn-danger:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 28px; left: 50%; transform: translateX(-50%) translateY(12px);
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 11px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 200;
+      white-space: nowrap;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #toast::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #toast.ok { border-color: rgba(6,214,160,0.3); color: var(--accent3); }
+    #toast.ok::before { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
+    #toast.err { border-color: rgba(240,80,80,0.3); color: var(--danger); }
+    #toast.err::before { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+
+    /* ── Running badge ── */
+    .running-badge {
+      position: absolute;
+      top: 7px; left: 7px;
+      background: var(--accent3);
+      color: #000;
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 3px 7px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(6,214,160,0.5);
+      z-index: 10;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .game-card {
+      animation: fadeSlideIn 0.3s ease both;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Titlebar -->
+<div id="titlebar">
+  <span class="logo">JVault</span>
+  <div class="logo-dot"></div>
+  <div class="spacer"></div>
+  <div class="win-controls">
+    <button class="win-btn" id="btn-min" onclick="window.__TAURI__.window.getCurrentWindow().minimize()"></button>
+    <button class="win-btn" id="btn-max" onclick="window.__TAURI__.window.getCurrentWindow().toggleMaximize()"></button>
+    <button class="win-btn" id="btn-close" onclick="window.__TAURI__.window.getCurrentWindow().close()"></button></div>
+</div> 
+<div id="layout">
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="sidebar-label">Library</div>
+    <div class="sidebar-item active" id="nav-all">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      All Games
+    </div>
+    <div class="sidebar-item" id="nav-recent">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      Recent
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-label">Settings</div>
+    <div class="sidebar-item" id="nav-settings">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </div>
+    <div class="bottom">
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="openAddModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Game
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div id="main">
+    <div id="toolbar">
+      <h1 id="view-title">All Games</h1>
+      <div class="search-wrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="search" placeholder="Search games…" oninput="renderGrid()" />
+      </div>
+      <span class="toolbar-spacer"></span>
+      <span id="game-count"></span>
+    </div>
+
+    <div id="content">
+      <div id="grid"></div>
+      <div id="empty">
+        <div class="empty-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/><path d="M8 12h.01"/><path d="M16 12h.01"/></svg>
+        </div>
+        <h2>No Games Yet</h2>
+        <p>Add your first game to start building your vault.</p>
+        <button class="btn btn-primary" onclick="openAddModal()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Game
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h2 id="modal-title">Add Game</h2>
+    <div class="field">
+      <label>Game Name</label>
+      <input type="text" id="f-name" placeholder="e.g. Hollow Knight Silksong" />
+    </div>
+    <div class="field">
+      <label>Executable Path</label>
+      <div class="input-row">
+        <input type="text" id="f-exe" placeholder="/path/to/game.exe" />
+        <button class="btn btn-ghost" onclick="browseExe()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Browse
+        </button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Icon Path <span style="color:var(--muted);font-size:9px;text-transform:none;letter-spacing:0">(optional — auto-extracted)</span></label>
+      <input type="text" id="f-icon" placeholder="/path/to/icon.png" />
+    </div>
+    <div class="field">
+      <label>ULWGL ID <span style="color:var(--muted);font-size:9px;text-transform:none;letter-spacing:0">(default: 0)</span></label>
+      <input type="text" id="f-ulwgl" placeholder="0" />
+    </div>
+    <div class="modal-row">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveGame()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save Game
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const appWindow = window.__TAURI__.window.getCurrentWindow();
+  
+  let games = [];
+  let editingId = null;
+  let currentView = 'all';
+  let runningIds = new Set();
+
+  // ── Asset URL ──
+  function toAssetUrl(path) {
+    if (!path) return null;
+    return window.__TAURI__.core.convertFileSrc(path);
+  }
+
+  // ── Init ──
+  async function init() {
+    try {
+      games = await invoke('load_games');
+    } catch (e) {
+      games = [];
+    }
+    renderGrid();
+  }
+
+  // ── Browse ──
+  async function browseExe() {
+    try {
+      const path = await invoke('pick_file');
+      if (path) {
+        document.getElementById('f-exe').value = path;
+
+        // Auto fill name
+        const filename = path.split('/').pop()
+                             .replace(/\.exe$/i, '')
+                             .replace(/[_\-]/g, ' ')
+                             .replace(/\b\w/g, c => c.toUpperCase());
+        if (!document.getElementById('f-name').value) {
+          document.getElementById('f-name').value = filename;
+        }
+
+        // Auto extract icon
+        toast('Extracting icon…', 'ok');
+        const iconPath = await invoke('extract_icon', { exePath: path });
+        if (iconPath) {
+          document.getElementById('f-icon').value = iconPath;
+          toast('Icon extracted!', 'ok');
+        } else {
+          toast('No icon found', 'err');
+        }
+      }
+    } catch(e) {
+      toast('File picker error: ' + e, 'err');
+    }
+  }
+
+  // ── Render ──
+  function renderGrid() {
+    const q = document.getElementById('search').value.toLowerCase();
+    let list = games;
+
+    if (currentView === 'recent') {
+      list = [...games]
+        .filter(g => g.last_played)
+        .sort((a,b) => (b.last_played||'').localeCompare(a.last_played||''))
+        .slice(0, 20);
+    }
+
+    if (q) list = list.filter(g => g.name.toLowerCase().includes(q));
+
+    const grid = document.getElementById('grid');
+    const empty = document.getElementById('empty');
+    document.getElementById('game-count').textContent =
+      list.length + (list.length === 1 ? ' game' : ' games');
+
+    if (list.length === 0) {
+      grid.innerHTML = '';
+      empty.style.display = 'flex';
+      return;
+    }
+    empty.style.display = 'none';
+
+    grid.innerHTML = list.map((g, i) => `
+      <div class="game-card" style="animation-delay:${i * 0.04}s" ondblclick="launch('${g.id}')">
+        <div class="card-cover">
+          ${g.icon_path
+            ? `<img src="${toAssetUrl(g.icon_path)}" alt="${g.name}" onerror="this.parentElement.innerHTML='<span class=\\'default-icon\\'>🎮</span>'" />`
+            : `<span class="default-icon">🎮</span>`}
+          <div class="card-overlay">
+            <div class="play-btn-big" onclick="event.stopPropagation(); launch('${g.id}')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </div>
+          </div>
+          ${runningIds.has(g.id) ? `<span class="running-badge">● live</span>` : ''}
+        </div>
+        <div class="card-info">
+          <div class="card-name" title="${g.name}">${g.name}</div>
+          <div class="card-meta">${g.last_played ? fmtDate(g.last_played) : 'never played'}</div>
+        </div>
+        <div class="card-actions">
+          <button class="icon-btn" title="Edit" onclick="event.stopPropagation(); openEditModal('${g.id}')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="icon-btn del" title="Delete" onclick="event.stopPropagation(); deleteGame('${g.id}')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function fmtDate(iso) {
+    try {
+      return new Date(iso).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+    } catch { return ''; }
+  }
+
+  // ── Launch ──
+  async function launch(id) {
+    const g = games.find(x => x.id === id);
+    if (!g) return;
+    try {
+      await invoke('launch_game', { exePath: g.exe_path, ulwglId: g.ulwgl_id || '0' });
+      g.last_played = new Date().toISOString();
+      runningIds.add(id);
+      await invoke('save_games', { games });
+      renderGrid();
+      toast('Launching ' + g.name, 'ok');
+      setTimeout(() => { runningIds.delete(id); renderGrid(); }, 5000);
+    } catch(e) {
+      toast('Launch failed: ' + e, 'err');
+    }
+  }
+
+  // ── CRUD ──
+  function openAddModal() {
+    editingId = null;
+    document.getElementById('modal-title').textContent = 'Add Game';
+    document.getElementById('f-name').value = '';
+    document.getElementById('f-exe').value = '';
+    document.getElementById('f-icon').value = '';
+    document.getElementById('f-ulwgl').value = '';
+    document.getElementById('modal').classList.add('open');
+    setTimeout(() => document.getElementById('f-name').focus(), 60);
+  }
+
+  function openEditModal(id) {
+    const g = games.find(x => x.id === id);
+    if (!g) return;
+    editingId = id;
+    document.getElementById('modal-title').textContent = 'Edit Game';
+    document.getElementById('f-name').value = g.name;
+    document.getElementById('f-exe').value = g.exe_path;
+    document.getElementById('f-icon').value = g.icon_path || '';
+    document.getElementById('f-ulwgl').value = g.ulwgl_id || '';
+    document.getElementById('modal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+  }
+
+  async function saveGame() {
+    const name = document.getElementById('f-name').value.trim();
+    const exe  = document.getElementById('f-exe').value.trim();
+    if (!name || !exe) { toast('Name and path are required', 'err'); return; }
+
+    if (editingId) {
+      const g = games.find(x => x.id === editingId);
+      if (g) {
+        g.name      = name;
+        g.exe_path  = exe;
+        g.icon_path = document.getElementById('f-icon').value.trim() || null;
+        g.ulwgl_id  = document.getElementById('f-ulwgl').value.trim() || '0';
+      }
+    } else {
+      games.push({
+        id: crypto.randomUUID(),
+        name,
+        exe_path: exe,
+        icon_path: document.getElementById('f-icon').value.trim() || null,
+        ulwgl_id: document.getElementById('f-ulwgl').value.trim() || '0',
+        play_time_seconds: 0,
+        last_played: null,
+      });
+    }
+
+    try {
+      await invoke('save_games', { games });
+      closeModal();
+      renderGrid();
+      toast(editingId ? 'Game updated' : 'Game added', 'ok');
+    } catch(e) {
+      toast('Save failed: ' + e, 'err');
+    }
+  }
+
+  async function deleteGame(id) {
+    const g = games.find(x => x.id === id);
+    if (!g) return;
+    if (!confirm(`Remove "${g.name}" from JVault?`)) return;
+    games = games.filter(x => x.id !== id);
+    try {
+      await invoke('save_games', { games });
+      renderGrid();
+      toast('Removed ' + g.name, 'ok');
+    } catch(e) {
+      toast('Error: ' + e, 'err');
+    }
+  }
+
+  // ── Nav ──
+  document.getElementById('nav-all').onclick = () => {
+    currentView = 'all';
+    document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('nav-all').classList.add('active');
+    document.getElementById('view-title').textContent = 'All Games';
+    renderGrid();
+  };
+  document.getElementById('nav-recent').onclick = () => {
+    currentView = 'recent';
+    document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('nav-recent').classList.add('active');
+    document.getElementById('view-title').textContent = 'Recently Played';
+    renderGrid();
+  };
+
+  // ── Keyboard ──
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Enter' && document.getElementById('modal').classList.contains('open')) saveGame();
+  });
+  document.getElementById('modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal')) closeModal();
+  });
+
+  // ── Toast ──
+  let toastTimer;
+  function toast(msg, type='ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = ''; }, 2800);
+  }
+
+  init();
+</script>
+</body>
+</html>
